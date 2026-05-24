@@ -35,7 +35,15 @@ jobs:
         run: |
           cat > immich/install.sh << 'EOF'
           #!/bin/bash
+
+          set -e
+
+          cd "$(dirname "$0")"
+
+          echo "Starting Immich..."
           docker compose up -d
+
+          echo "Immich started."
           EOF
 
           chmod +x immich/install.sh
@@ -43,8 +51,17 @@ jobs:
       - name: Make run package
         run: |
           mkdir -p output
+
           makeself immich output/immich.run \
           "Immich Installer" ./install.sh
+
+      - name: Delete old tag
+        continue-on-error: true
+        run: |
+          gh release delete immich-latest -y || true
+          git push origin :refs/tags/immich-latest || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Release
         uses: softprops/action-gh-release@v2
