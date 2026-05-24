@@ -1,0 +1,50 @@
+name: Build Immich Run File
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt update
+          sudo apt install -y makeself curl
+
+      - name: Create workspace
+        run: |
+          mkdir -p immich
+
+      - name: Download Immich compose
+        run: |
+          wget -O immich/docker-compose.yml \
+          https://github.com/immich-app/immich/releases/latest/download/docker-compose.yml
+
+          wget -O immich/.env \
+          https://github.com/immich-app/immich/releases/latest/download/example.env
+
+      - name: Create install.sh
+        run: |
+          cat > immich/install.sh << 'EOF'
+          #!/bin/bash
+          docker compose up -d
+          EOF
+
+          chmod +x immich/install.sh
+
+      - name: Make run package
+        run: |
+          mkdir output
+          makeself immich output/immich.run "Immich Installer" ./install.sh
+
+      - name: Upload release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: immich-latest
+          name: Immich-latest
+          files: output/*.run
