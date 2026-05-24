@@ -34,16 +34,46 @@ jobs:
       - name: Create install.sh
         run: |
           cat > immich/install.sh << 'EOF'
-          #!/bin/bash
+          #!/bin/sh
 
           set -e
 
           cd "$(dirname "$0")"
 
-          echo "Starting Immich..."
+          echo "================================="
+          echo "Immich Upgrade Installer"
+          echo "================================="
+
+          mkdir -p /opt/immich
+
+          # 首次安装时保存配置
+          if [ ! -f /opt/immich/docker-compose.yml ]; then
+              cp docker-compose.yml /opt/immich/
+          fi
+
+          if [ ! -f /opt/immich/.env ]; then
+              cp .env /opt/immich/
+          fi
+
+          cd /opt/immich
+
+          echo "[1/4] Stop old containers..."
+          docker compose down || true
+
+          echo "[2/4] Pull latest images..."
+          docker compose pull
+
+          echo "[3/4] Start Immich..."
           docker compose up -d
 
-          echo "Immich started."
+          echo "[4/4] Clean old dangling images..."
+          docker image prune -f || true
+
+          echo ""
+          echo "================================="
+          echo "Immich upgrade completed"
+          echo "Web UI: http://$(hostname -I | awk '{print $1}'):2283"
+          echo "================================="
           EOF
 
           chmod +x immich/install.sh
@@ -53,15 +83,15 @@ jobs:
           mkdir -p output
 
           makeself immich output/immich.run \
-          "Immich Installer" ./install.sh
+          "Immich Upgrade Installer" ./install.sh
 
-      - name: Delete old tag
+      - name: Delete old release
         continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release delete immich-latest -y || true
           git push origin :refs/tags/immich-latest || true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Release
         uses: softprops/action-gh-release@v2
